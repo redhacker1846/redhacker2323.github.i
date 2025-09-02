@@ -1,0 +1,361 @@
+import sys
+import os
+import time
+import threading
+from datetime import datetime
+import pyttsx3
+import speech_recognition as sr
+import webbrowser
+import pyautogui
+from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
+                             QHBoxLayout, QLabel, QPushButton, QTextEdit, QFrame)
+from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtGui import QFont, QPalette, QColor, QIcon
+
+class AssistantThread(threading.Thread):
+    def __init__(self, assistant):
+        super().__init__()
+        self.assistant = assistant
+        self.daemon = True
+        
+    def run(self):
+        self.assistant.run()
+
+class VoiceAssistant:
+    def __init__(self, gui):
+        self.gui = gui
+        self.engine = pyttsx3.init()
+        voices = self.engine.getProperty('voices')
+        if len(voices) > 1:
+            self.engine.setProperty('voice', voices[1].id)
+        else:
+            self.engine.setProperty('voice', voices[0].id)
+        
+    def speak(self, text):
+        self.gui.update_output(text)
+        self.engine.say(text)
+        self.engine.runAndWait()
+        
+    def take_command(self):
+        r = sr.Recognizer()
+        with sr.Microphone() as source:
+            self.gui.update_status("Listening...", "#2ecc71")
+            audio = r.listen(source)
+            
+        try:
+            self.gui.update_status("Recognizing...", "#3498db")
+            text = r.recognize_google(audio, language='en-in')
+            self.gui.update_input(text)
+            return text.lower()
+        except Exception as e:
+            self.gui.update_status("Ready", "#f39c12")
+            return ""
+            
+    def greeting(self):
+        hour = datetime.now().hour
+        today = datetime.now().strftime("%d %B, %Y")
+        
+        if 0 <= hour < 12:
+            self.speak("Good morning sir...")
+            self.speak(f"Today is {today}")
+        elif 12 <= hour <= 18:
+            self.speak("Good afternoon sir...")
+        else:
+            self.speak("Good evening sir...")
+            
+    def run(self):
+        self.gui.update_status("Ready", "#f39c12")
+        while True:
+            command = self.take_command()
+            if "jarvis" in command or "wake up" in command:
+                self.greeting()
+                
+                while True:
+                    command = self.take_command()
+                    if not command:
+                        continue
+                        
+                    if "open chrome" in command:
+                        self.speak("I am opening Chrome sir")
+                        try:
+                            chromepath = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
+                            os.startfile(chromepath)
+                        except:
+                            webbrowser.open("https://google.com")
+                            
+                    elif "open youtube" in command:
+                        self.speak("I am opening YouTube sir")
+                        webbrowser.open("https://youtube.com")
+                        
+                    elif "play a song for me" in command:
+                        self.speak("I am opening Spotify sir")
+                        webbrowser.open("https://spotify.com")
+                        
+                    elif "open vs code" in command:
+                        self.speak("I am opening VS Code sir")
+                        try:
+                            codepath = "C:\\Users\\SAINATH\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe"
+                            os.startfile(codepath)
+                        except:
+                            self.speak("I couldn't find VS Code on your system")
+                            
+                    elif "open open office" in command:
+                        self.speak("I am opening Open Office sir")
+                        try:
+                            openpath = "C:\\Program Files (x86)\\OpenOffice 4\\program\\soffice.exe"
+                            os.startfile(openpath)
+                        except:
+                            self.speak("I couldn't find Open Office on your system")
+                            
+                    elif "open typing master" in command:
+                        self.speak("Opening Typing Master sir")
+                        try:
+                            typepath = "G:\\TypingMaster11\\TypingMaster.exe"
+                            os.startfile(typepath)
+                        except:
+                            self.speak("I couldn't find Typing Master on your system")
+                            
+                    elif "open cmd" in command:
+                        self.speak("Opening command prompt")
+                        os.system("start cmd")
+                        
+                    elif "search" in command:
+                        query = command.replace("search", "").strip()
+                        if query:
+                            search_query = '+'.join(query.split())
+                            url = f'https://www.google.com/search?q={search_query}'
+                            webbrowser.open_new(url)
+                            self.speak(f"Searching for {query}")
+                            
+                    elif "close application" in command:
+                        self.speak("Closing sir...")
+                        pyautogui.hotkey("alt", "f4")
+                        
+                    elif "open this pc" in command:
+                        pyautogui.hotkey("win", "e")
+                        self.speak("Opening File Explorer")
+                        
+                    elif "go to sleep" in command:
+                        self.speak("I am going to sleep sir")
+                        break
+                        
+                    elif "shutdown" in command:
+                        self.speak("I am shutting down sir")
+                        return
+                        
+                    elif "what is the time" in command:
+                        current_time = datetime.now().strftime("%I:%M %p")
+                        self.speak(f"The time is {current_time}")
+                        
+                    elif "what is the date" in command:
+                        today = datetime.now().strftime("%d %B, %Y")
+                        self.speak(f"Today is {today}")
+                        
+                    elif "exit" in command or "quit" in command:
+                        self.speak("Goodbye sir")
+                        return
+
+class AssistantGUI(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.initUI()
+        self.assistant = VoiceAssistant(self)
+        self.assistant_thread = AssistantThread(self.assistant)
+        
+    def initUI(self):
+        self.setWindowTitle("PyAssistant - Voice Controlled Assistant")
+        self.setGeometry(100, 100, 900, 700)
+        self.setStyleSheet("""
+            QMainWindow {
+                background-color: #2c3e50;
+            }
+            QFrame {
+                background-color: #34495e;
+                border-radius: 15px;
+            }
+            QLabel {
+                color: #ecf0f1;
+            }
+            QPushButton {
+                background-color: #3498db;
+                color: white;
+                border: none;
+                border-radius: 10px;
+                padding: 10px;
+                font-size: 14px;
+            }
+            QPushButton:hover {
+                background-color: #2980b9;
+            }
+            QPushButton:pressed {
+                background-color: #1c638e;
+            }
+            QTextEdit {
+                background-color: #2c3e50;
+                color: #ecf0f1;
+                border: 2px solid #3498db;
+                border-radius: 10px;
+                padding: 10px;
+                font-size: 14px;
+            }
+        """)
+        
+        # Central widget
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+        layout = QVBoxLayout(central_widget)
+        
+        # Title
+        title = QLabel("PyAssistant - Your Voice Controlled Assistant")
+        title.setAlignment(Qt.AlignCenter)
+        title.setFont(QFont("Arial", 20, QFont.Bold))
+        layout.addWidget(title)
+        
+        # Status frame
+        status_frame = QFrame()
+        status_layout = QHBoxLayout(status_frame)
+        status_label = QLabel("Status:")
+        status_label.setFont(QFont("Arial", 12))
+        self.status_value = QLabel("Initializing...")
+        self.status_value.setFont(QFont("Arial", 12, QFont.Bold))
+        status_layout.addWidget(status_label)
+        status_layout.addWidget(self.status_value)
+        status_layout.addStretch()
+        layout.addWidget(status_frame)
+        
+        # System info frame
+        info_frame = QFrame()
+        info_layout = QHBoxLayout(info_frame)
+        
+        time_label = QLabel()
+        time_label.setFont(QFont("Arial", 10))
+        info_layout.addWidget(time_label)
+        
+        date_label = QLabel()
+        date_label.setFont(QFont("Arial", 10))
+        info_layout.addWidget(date_label)
+        
+        info_layout.addStretch()
+        layout.addWidget(info_frame)
+        
+        # Update time and date
+        self.time_label = time_label
+        self.date_label = date_label
+        self.update_time_date()
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.update_time_date)
+        self.timer.start(1000)
+        
+        # Input and output frames
+        io_frame = QFrame()
+        io_layout = QVBoxLayout(io_frame)
+        
+        input_label = QLabel("Your Command:")
+        input_label.setFont(QFont("Arial", 12))
+        io_layout.addWidget(input_label)
+        
+        self.input_display = QTextEdit()
+        self.input_display.setReadOnly(True)
+        io_layout.addWidget(self.input_display)
+        
+        output_label = QLabel("Assistant Response:")
+        output_label.setFont(QFont("Arial", 12))
+        io_layout.addWidget(output_label)
+        
+        self.output_display = QTextEdit()
+        self.output_display.setReadOnly(True)
+        io_layout.addWidget(self.output_display)
+        
+        layout.addWidget(io_frame)
+        
+        # Buttons frame
+        buttons_frame = QFrame()
+        buttons_layout = QHBoxLayout(buttons_frame)
+        
+        self.start_btn = QPushButton("Start Listening")
+        self.start_btn.clicked.connect(self.start_listening)
+        buttons_layout.addWidget(self.start_btn)
+        
+        self.sleep_btn = QPushButton("Put to Sleep")
+        self.sleep_btn.clicked.connect(self.put_to_sleep)
+        buttons_layout.addWidget(self.sleep_btn)
+        
+        self.exit_btn = QPushButton("Exit")
+        self.exit_btn.clicked.connect(self.exit_app)
+        buttons_layout.addWidget(self.exit_btn)
+        
+        layout.addWidget(buttons_frame)
+        
+        # Command help
+        help_frame = QFrame()
+        help_layout = QVBoxLayout(help_frame)
+        help_title = QLabel("Available Commands:")
+        help_title.setFont(QFont("Arial", 12, QFont.Bold))
+        help_layout.addWidget(help_title)
+        
+        commands = [
+            "Say 'Jarvis' or 'Wake up' to activate",
+            "Open Chrome, YouTube, VS Code, etc.",
+            "Play a song for me (opens Spotify)",
+            "Search [your query]",
+            "What is the time/date?",
+            "Close application (Alt+F4)",
+            "Open This PC (File Explorer)",
+            "Go to sleep (deactivate until wake word)",
+            "Shutdown (exit program)"
+        ]
+        
+        for cmd in commands:
+            label = QLabel(f"• {cmd}")
+            label.setFont(QFont("Arial", 10))
+            help_layout.addWidget(label)
+            
+        layout.addWidget(help_frame)
+        
+    def update_time_date(self):
+        current_time = datetime.now().strftime("%I:%M:%S %p")
+        current_date = datetime.now().strftime("%d %B, %Y")
+        self.time_label.setText(f"Time: {current_time}")
+        self.date_label.setText(f"Date: {current_date}")
+        
+    def update_status(self, text, color="#f39c12"):
+        self.status_value.setText(text)
+        self.status_value.setStyleSheet(f"color: {color};")
+        
+    def update_input(self, text):
+        self.input_display.setText(text)
+        
+    def update_output(self, text):
+        self.output_display.append(f"Assistant: {text}")
+        
+    def start_listening(self):
+        self.update_status("Listening...", "#2ecc71")
+        self.assistant.take_command()
+        
+    def put_to_sleep(self):
+        self.update_status("Sleeping", "#7f8c8d")
+        self.output_display.append("Assistant: I am going to sleep sir")
+        
+    def exit_app(self):
+        self.assistant.speak("Goodbye sir")
+        QApplication.quit()
+        
+    def showEvent(self, event):
+        super().showEvent(event)
+        if not self.assistant_thread.is_alive():
+            self.assistant_thread.start()
+
+def main():
+    app = QApplication(sys.argv)
+    app.setApplicationName("PyAssistant")
+    
+    # Set app style
+    app.setStyle('Fusion')
+    
+    gui = AssistantGUI()
+    gui.show()
+    
+    sys.exit(app.exec_())
+
+if __name__ == "__main__":
+    main()
